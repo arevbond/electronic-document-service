@@ -1,0 +1,48 @@
+# Данный docker compose файл предназначен только для ЛОКАЛЬНОЙ разработки прямо в контейнере приложения
+services:
+  app:
+    container_name: "app-service"
+    build:
+      context: .
+      dockerfile: Dockerfile
+      #      dockerfile: Dockerfile.dbg
+      target: build-stage
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: go run ./cmd/main.go
+    #    command: dlv debug ./cmd/main.go  --headless --listen=:2345 --api-version=2 --accept-multiclient
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - 8888:8080
+      - 2345:2345  # Порт для подключения дебаггера
+
+  db:
+    container_name: "service-database"
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+      POSTGRES_USER: ${PG_USERNAME}
+      POSTGRES_DB: ${PG_DBNAME}
+    ports:
+      - 5433:5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USERNAME} -d ${PG_DBNAME}"]
+      interval: 10s
+      timeout: 10s
+      retries: 3
+
+  migrate:
+    container_name: "goose-service-migrator"
+    image: blessyo7/migrator
+    volumes:
+      - ./migrations:/migrations
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    command: ["postgres", "${DATABASE_URL}", "up"]
+    depends_on:
+      db:
+        condition: service_healthy

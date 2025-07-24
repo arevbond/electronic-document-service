@@ -1,0 +1,555 @@
+openapi: 3.0.3
+info:
+  title: Electronic Documents Service API
+  description: REST API для сохранения и раздачи электронных документов
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: Development server
+
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: integer
+              example: 123
+            text:
+              type: string
+              example: "so sad"
+          required:
+            - code
+            - text
+
+    BaseResponse:
+      type: object
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorResponse/properties/error'
+        response:
+          type: object
+        data:
+          type: object
+
+    DocumentMeta:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "photo.jpg"
+        file:
+          type: boolean
+          example: true
+        public:
+          type: boolean
+          example: false
+        token:
+          type: string
+          example: "sfuqwejqjoiu93e29"
+        mime:
+          type: string
+          example: "image/jpg"
+        grant:
+          type: array
+          items:
+            type: string
+          example: ["login1", "login2"]
+      required:
+        - name
+        - file
+        - public
+        - token
+        - mime
+
+    Document:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "qwdj1q4o34u34ih759ou1"
+        name:
+          type: string
+          example: "photo.jpg"
+        mime:
+          type: string
+          example: "image/jpg"
+        file:
+          type: boolean
+          example: true
+        public:
+          type: boolean
+          example: false
+        created:
+          type: string
+          format: date-time
+          example: "2018-12-24 10:30:56"
+        grant:
+          type: array
+          items:
+            type: string
+          example: ["login1", "login2"]
+      required:
+        - id
+        - name
+        - mime
+        - file
+        - public
+        - created
+
+    RegisterRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          description: "Токен администратора (фиксированный, из конфига)"
+          example: "admin_token_123"
+        login:
+          type: string
+          description: "Логин пользователя (минимум 8 символов, латиница и цифры)"
+          pattern: "^[a-zA-Z0-9]{8,}$"
+          example: "testuser123"
+        pswd:
+          type: string
+          description: "Пароль (минимум 8 символов, 2 буквы разных регистров, 1 цифра, 1 спецсимвол)"
+          minLength: 8
+          example: "MyPass123!"
+      required:
+        - token
+        - login
+        - pswd
+
+    AuthRequest:
+      type: object
+      properties:
+        login:
+          type: string
+          example: "testuser123"
+        pswd:
+          type: string
+          example: "MyPass123!"
+      required:
+        - login
+        - pswd
+
+  parameters:
+    TokenParam:
+      name: token
+      in: query
+      required: true
+      schema:
+        type: string
+      example: "sfuqwejqjoiu93e29"
+
+    DocumentIdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      example: "qwdj1q4o34u34ih759ou1"
+
+    LoginParam:
+      name: login
+      in: query
+      required: false
+      description: "Логин пользователя для получения его документов (опционально)"
+      schema:
+        type: string
+      example: "testuser123"
+
+    FilterKeyParam:
+      name: key
+      in: query
+      required: false
+      description: "Имя колонки для фильтрации"
+      schema:
+        type: string
+      example: "name"
+
+    FilterValueParam:
+      name: value
+      in: query
+      required: false
+      description: "Значение фильтра"
+      schema:
+        type: string
+      example: "photo"
+
+    LimitParam:
+      name: limit
+      in: query
+      required: false
+      description: "Количество документов в списке"
+      schema:
+        type: integer
+        minimum: 1
+      example: 10
+
+  responses:
+    BadRequest:
+      description: Некорректные параметры
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: 400
+              text: "Invalid parameters"
+
+    Unauthorized:
+      description: Не авторизован
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: 401
+              text: "Unauthorized"
+
+    Forbidden:
+      description: Нет прав доступа
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: 403
+              text: "Access denied"
+
+    MethodNotAllowed:
+      description: Неверный метод запроса
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: 405
+              text: "Method not allowed"
+
+    InternalServerError:
+      description: Внутренняя ошибка сервера
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: 500
+              text: "Internal server error"
+
+    NotImplemented:
+      description: Метод не реализован
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: 501
+              text: "Not implemented"
+
+paths:
+  /api/register:
+    post:
+      summary: Регистрация нового пользователя
+      description: Создание нового пользователя с логином и паролем
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: Успешная регистрация
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  response:
+                    type: object
+                    properties:
+                      login:
+                        type: string
+                        example: "testuser123"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/auth:
+    post:
+      summary: Аутентификация пользователя
+      description: Получение токена авторизации по логину и паролю
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AuthRequest'
+      responses:
+        '200':
+          description: Успешная аутентификация
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  response:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                        example: "sfuqwejqjoiu93e29"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      summary: Завершение авторизованной сессии
+      description: Выход из системы и инвалидация токена
+      parameters:
+        - $ref: '#/components/parameters/TokenParam'
+      responses:
+        '200':
+          description: Успешное завершение сессии
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  response:
+                    type: object
+                    additionalProperties:
+                      type: boolean
+                    example:
+                      "qwdj1q4o34u34ih759ou1": true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/docs:
+    post:
+      summary: Загрузка нового документа
+      description: Загрузка документа с метаданными и опциональными JSON данными
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                meta:
+                  description: "Метаданные документа в JSON формате"
+                  allOf:
+                    - $ref: '#/components/schemas/DocumentMeta'
+                json:
+                  type: string
+                  description: "Дополнительные данные документа в JSON формате (опционально)"
+                  example: '{"description": "My photo", "tags": ["vacation"]}'
+                file:
+                  type: string
+                  format: binary
+                  description: "Файл документа"
+              required:
+                - meta
+                - file
+            encoding:
+              meta:
+                contentType: application/json
+      responses:
+        '200':
+          description: Успешная загрузка документа
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      json:
+                        type: object
+                        description: "Данные документа (если были переданы)"
+                      file:
+                        type: string
+                        example: "photo.jpg"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    get:
+      summary: Получение списка документов
+      description: Получить список документов с возможностью фильтрации
+      parameters:
+        - $ref: '#/components/parameters/TokenParam'
+        - $ref: '#/components/parameters/LoginParam'
+        - $ref: '#/components/parameters/FilterKeyParam'
+        - $ref: '#/components/parameters/FilterValueParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Список документов
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      docs:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Document'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    head:
+      summary: Получение заголовков списка документов
+      description: То же что GET /api/docs, но без тела ответа
+      parameters:
+        - $ref: '#/components/parameters/TokenParam'
+        - $ref: '#/components/parameters/LoginParam'
+        - $ref: '#/components/parameters/FilterKeyParam'
+        - $ref: '#/components/parameters/FilterValueParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Заголовки списка документов (без тела)
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/docs/{id}:
+    get:
+      summary: Получение одного документа
+      description: Получить документ по ID. Если это файл - возвращается файл с правильным MIME типом, если JSON данные - возвращается JSON
+      parameters:
+        - $ref: '#/components/parameters/DocumentIdParam'
+        - $ref: '#/components/parameters/TokenParam'
+      responses:
+        '200':
+          description: Документ найден
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    description: "JSON данные документа"
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+                description: "Бинарные данные файла"
+            image/*:
+              schema:
+                type: string
+                format: binary
+                description: "Изображение"
+            text/*:
+              schema:
+                type: string
+                description: "Текстовый файл"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Документ не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: 404
+                  text: "Document not found"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    head:
+      summary: Получение заголовков документа
+      description: То же что GET /api/docs/{id}, но без тела ответа
+      parameters:
+        - $ref: '#/components/parameters/DocumentIdParam'
+        - $ref: '#/components/parameters/TokenParam'
+      responses:
+        '200':
+          description: Заголовки документа (без тела)
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Документ не найден
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      summary: Удаление документа
+      description: Удалить документ по ID
+      parameters:
+        - $ref: '#/components/parameters/DocumentIdParam'
+        - $ref: '#/components/parameters/TokenParam'
+      responses:
+        '200':
+          description: Документ успешно удален
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  response:
+                    type: object
+                    additionalProperties:
+                      type: boolean
+                    example:
+                      "qwdj1q4o34u34ih759ou1": true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Документ не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: 404
+                  text: "Document not found"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
