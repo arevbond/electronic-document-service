@@ -14,7 +14,7 @@ import (
 	"github.com/lmittmann/tint"
 )
 
-var version = "unknown"
+var version = "dev"
 
 func main() {
 	flag.Parse()
